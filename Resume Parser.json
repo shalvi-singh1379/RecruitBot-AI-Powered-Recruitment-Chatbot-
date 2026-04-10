@@ -1,0 +1,547 @@
+{
+  "name": "Resume Parser",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "triggerOn": "specificFolder",
+        "folderToWatch": {
+          "__rl": true,
+          "value": "1uRbF4DUTLRAwe7FFRsKlm3iOMEworpOX",
+          "mode": "list",
+          "cachedResultName": "Resumes - Incoming",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/1uRbF4DUTLRAwe7FFRsKlm3iOMEworpOX"
+        },
+        "event": "={{ \"fileCreated\" }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDriveTrigger",
+      "typeVersion": 1,
+      "position": [
+        -16,
+        -64
+      ],
+      "id": "44d1f258-4003-410c-864f-75589500f862",
+      "name": "Google Drive Trigger",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "mq8YZPnQeBGAvdki",
+          "name": "Google Drive OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{$json[\"id\"]}}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        16,
+        176
+      ],
+      "id": "4c7958eb-0bc5-4eb7-828b-f3d047c19af8",
+      "name": "Download file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "mq8YZPnQeBGAvdki",
+          "name": "Google Drive OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        432
+      ],
+      "id": "430a849b-bf05-4ca8-84f5-d4c5d3d8a206",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4O-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are a resume parser. Extract the following fields from the resume text below and return ONLY a valid JSON object with no extra text, no markdown, no code fences.\n\nFields to extract:\n- candidate_name (string)\n- email (string)\n- phone (string)\n- education (string, e.g. \"B.Tech Computer Science\")\n- university (string)\n- experience_years (number, estimate if not explicit)\n- companies (string, comma-separated list)\n- skills (string, comma-separated list)\n- certifications (string, comma-separated or \"None\")\n- projects (string, brief comma-separated list)\n- current_role (string)\n- location (string)\n\nIf a field is not found, use an empty string \"\" or 0 for numbers. Do not guess. Do not add fields not listed above."
+            },
+            {
+              "content": "={{$json[\"text\"]}}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "textFormat": {
+            "textOptions": {
+              "type": "json_object"
+            }
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        352,
+        -48
+      ],
+      "id": "da35c70d-5dfe-48c5-8ba1-b91b3a1dee49",
+      "name": "Message a model",
+      "credentials": {
+        "openAiApi": {
+          "id": "EDDs0J68S4uGIAHe",
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4O-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are a recruitment evaluator for a Data/ML engineering role. \nScore the candidate from 0–100 based on these weighted criteria:\n\n- Skill match (relevant tech stack): 35 points max\n- Years of experience: 25 points max  \n- Education relevance: 15 points max\n- Certifications: 10 points max\n- Quality of projects: 15 points max\n\nThen categorize:\n- score >= 80 → \"Good\"\n- score 50–79 → \"On Hold\"\n- score < 50 → \"Rejected\"\n\nReturn ONLY a valid JSON object with no extra text:\n{\n  \"score\": <number 0-100>,\n  \"category\": \"<Good|On Hold|Rejected>\",\n  \"reason\": \"<1-2 sentence explanation>\"\n}"
+            },
+            {
+              "content": "=Candidate profile:\n{{ JSON.stringify($json) }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "textFormat": {
+            "textOptions": {
+              "type": "json_object"
+            }
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        320,
+        192
+      ],
+      "id": "a1750eb6-b371-4b92-9071-bb65e64d3de9",
+      "name": "Message a model1",
+      "credentials": {
+        "openAiApi": {
+          "id": "EDDs0J68S4uGIAHe",
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3b8dcec8-f9ed-4144-809a-5d03f81ddd52",
+              "name": "candidate_name",
+              "value": "={{ $('Message a model').item.json.output[0].content[0].text.candidate_name }}",
+              "type": "string"
+            },
+            {
+              "id": "b597a12b-15a7-40dd-a0cf-fd18c489dcb7",
+              "name": "email",
+              "value": "={{ $('Message a model').item.json.output[0].content[0].text.email }}",
+              "type": "string"
+            },
+            {
+              "id": "dbc595b9-876c-4d82-97db-8302a7aa544c",
+              "name": "phone",
+              "value": "={{ $('Message a model').item.json.output[0].content[0].text.phone }}",
+              "type": "string"
+            },
+            {
+              "id": "f8c3f896-b760-4818-9532-aaccd3e8c70c",
+              "name": "education",
+              "value": "={{ $('Message a model').item.json.output[0].content[0].text.education }}",
+              "type": "string"
+            },
+            {
+              "id": "1f3f5216-acdb-4c01-b76c-971a15f61481",
+              "name": "university",
+              "value": "={{ $('Message a model').item.json.output[0].content[0].text.university }}",
+              "type": "string"
+            },
+            {
+              "id": "254c5d69-6939-40fb-a50e-2cd3d07970f4",
+              "name": "experience_years",
+              "value": "={{ $('Message a model').item.json.output[0].content[0].text.experience_years }}",
+              "type": "number"
+            },
+            {
+              "id": "2d248571-8f46-4d4c-ace1-67164257fb2c",
+              "name": "companies",
+              "value": "={{ $('Message a model').item.json.output[0].content[0].text.companies }}",
+              "type": "string"
+            },
+            {
+              "id": "39815648-293d-470f-b764-e69fe6c53455",
+              "name": "skills",
+              "value": "={{ $('Message a model').item.json.output[0].content[0].text.skills }}",
+              "type": "string"
+            },
+            {
+              "id": "a08406b6-6336-40a2-a667-11bd91812edd",
+              "name": "certifications",
+              "value": "={{ $('Message a model').item.json.output[0].content[0].text.certifications }}",
+              "type": "string"
+            },
+            {
+              "id": "8ba3048f-21f2-4dfb-a406-d78473d3ec63",
+              "name": "projects",
+              "value": "={{ $('Message a model').item.json.output[0].content[0].text.projects }}",
+              "type": "string"
+            },
+            {
+              "id": "9bb1bfcf-6beb-42cb-a3c4-cb1b0de73a69",
+              "name": "current_role",
+              "value": "={{ $('Message a model').item.json.output[0].content[0].text.current_role }}",
+              "type": "string"
+            },
+            {
+              "id": "f48e7e1e-06c8-4602-97a1-f46ca98f83cb",
+              "name": "location",
+              "value": "={{ $('Message a model').item.json.output[0].content[0].text.location }}",
+              "type": "string"
+            },
+            {
+              "id": "e82b8d57-f3b4-405c-b134-cbb3d25b9868",
+              "name": "score",
+              "value": "={{ $json.output[0].content[0].text.score }}",
+              "type": "number"
+            },
+            {
+              "id": "fd9f4727-24a2-4a63-90c9-873c5a6de833",
+              "name": "Category",
+              "value": "={{ $json.output[0].content[0].text.category }}",
+              "type": "string"
+            },
+            {
+              "id": "ecd9586b-486d-4237-b13b-3ca4c7375c73",
+              "name": "Reason",
+              "value": "={{ $json.output[0].content[0].text.reason }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        496,
+        432
+      ],
+      "id": "7d76641c-611f-40b3-8c50-5a298acb6857",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1nA4gxOIsUmwgLSktLTh8lxOuhfC0JSznQz3shh1QOVI",
+          "mode": "list",
+          "cachedResultName": "Resume Shortlisting",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1nA4gxOIsUmwgLSktLTh8lxOuhfC0JSznQz3shh1QOVI/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1nA4gxOIsUmwgLSktLTh8lxOuhfC0JSznQz3shh1QOVI/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "candidate_name ": "={{ $json.candidate_name }}",
+            "email ": "={{ $json.email }}",
+            "phone ": "={{ \"'\" + $json[\"phone\"] }}",
+            "education ": "={{ $json.education }}",
+            "university ": "={{ $json.university }}",
+            "experience_years": "={{ $json.experience_years }}",
+            "companies ": "={{ $json.companies }}",
+            "skills": "={{ $json.skills }}",
+            "certifications ": "={{ $json.certifications }}",
+            "projects": "={{ $json.projects }}",
+            "current_role": "={{ $json.current_role }}",
+            "location ": "={{ $json.location }}",
+            "score": "={{ $json.score }}",
+            "category": "={{ $json.Category }}",
+            "reason": "={{ $json.Reason }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "candidate_name ",
+              "displayName": "candidate_name ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email ",
+              "displayName": "email ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "phone ",
+              "displayName": "phone ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "education ",
+              "displayName": "education ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "university ",
+              "displayName": "university ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "experience_years",
+              "displayName": "experience_years",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "companies ",
+              "displayName": "companies ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "skills",
+              "displayName": "skills",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "certifications ",
+              "displayName": "certifications ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "projects",
+              "displayName": "projects",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "current_role",
+              "displayName": "current_role",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "location ",
+              "displayName": "location ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "score",
+              "displayName": "score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        864,
+        -16
+      ],
+      "id": "6f68737f-dc96-40bd-ad75-9c215a1ab8cd",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "gWON1q033eowV2cV",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Google Drive Trigger": {
+      "main": [
+        [
+          {
+            "node": "Download file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download file": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Message a model1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model1": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "6667d304-fb03-4ca4-982a-fff400cdb8ce",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d4b9d2f8c265a47d4d5c0a82da9e7416d5d958a9fda68e9fcdcc99c95d788736"
+  },
+  "id": "0C9H1LKWkfbkVcEM",
+  "tags": []
+}

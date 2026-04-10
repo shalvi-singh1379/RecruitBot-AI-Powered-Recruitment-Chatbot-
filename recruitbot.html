@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>RecruitBot</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: sans-serif; background: #f5f5f5; }
+    .rb-wrap { max-width: 680px; margin: 0 auto; padding: 24px 20px; }
+    .rb-header { margin-bottom: 20px; }
+    .rb-header h2 { font-size: 20px; font-weight: 500; }
+    .rb-header p { font-size: 13px; color: #888; margin-top: 4px; }
+    .rb-chat { background: white; border: 1px solid #e5e5e5; border-radius: 12px; padding: 16px; min-height: 320px; max-height: 480px; overflow-y: auto; margin-bottom: 12px; display: flex; flex-direction: column; gap: 10px; }
+    .msg { display: flex; flex-direction: column; max-width: 80%; }
+    .msg.user { align-self: flex-end; align-items: flex-end; }
+    .msg.bot { align-self: flex-start; align-items: flex-start; }
+    .bubble { padding: 10px 14px; border-radius: 16px; font-size: 14px; line-height: 1.6; white-space: pre-wrap; }
+    .user .bubble { background: #0066ff; color: white; border-radius: 16px 16px 4px 16px; }
+    .bot .bubble { background: #f0f0f0; color: #333; border-radius: 16px 16px 16px 4px; }
+    .bot.error .bubble { background: #fff0f0; color: #cc0000; }
+    .rb-input { display: flex; gap: 8px; }
+    .rb-input input { flex: 1; padding: 10px 14px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; }
+    .rb-input input:focus { border-color: #0066ff; }
+    .rb-input button { padding: 10px 18px; background: #0066ff; color: white; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; }
+    .rb-input button:disabled { background: #aaa; cursor: not-allowed; }
+    .status { font-size: 12px; color: #aaa; margin-top: 8px; }
+    .typing { display: flex; gap: 4px; align-items: center; padding: 10px 14px; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: #aaa; animation: bounce 1.2s infinite; }
+    .dot:nth-child(2) { animation-delay: 0.2s; }
+    .dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes bounce { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-6px)} }
+  </style>
+</head>
+<body>
+  <div class="rb-wrap">
+    <div class="rb-header">
+      <h2>RecruitBot</h2>
+      <p>Ask anything about your candidates</p>
+    </div>
+    <div class="rb-chat" id="chat">
+      <div class="msg bot"><div class="bubble">Hello! I'm RecruitBot. Ask me about your candidates.</div></div>
+    </div>
+    <div class="rb-input">
+      <input id="query" type="text" placeholder="e.g. Who has the highest score?" />
+      <button id="btn">Ask</button>
+    </div>
+    <div class="status" id="status"></div>
+  </div>
+
+  <script>
+    const WEBHOOK_URL = 'https://shalviiii.app.n8n.cloud/webhook/resume-chat';
+
+    const chat = document.getElementById('chat');
+    const input = document.getElementById('query');
+    const btn = document.getElementById('btn');
+    const status = document.getElementById('status');
+
+    function addMsg(text, type, isError) {
+      const div = document.createElement('div');
+      div.className = 'msg ' + type + (isError ? ' error' : '');
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble';
+      bubble.textContent = text;
+      div.appendChild(bubble);
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    function addTyping() {
+      const div = document.createElement('div');
+      div.className = 'msg bot';
+      div.id = 'typing';
+      div.innerHTML = '<div class="bubble typing"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>';
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    function removeTyping() {
+      const t = document.getElementById('typing');
+      if (t) t.remove();
+    }
+
+    async function ask() {
+      const query = input.value.trim();
+      if (!query) return;
+
+      addMsg(query, 'user');
+      input.value = '';
+      btn.disabled = true;
+      btn.textContent = '...';
+      status.textContent = 'Connecting to n8n...';
+      addTyping();
+
+      try {
+        const res = await fetch(WEBHOOK_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: query })
+        });
+        const data = await res.json();
+        removeTyping();
+
+        if (data.answer) {
+          addMsg(data.answer, 'bot');
+          status.textContent = '';
+        } else {
+          addMsg('Got a response but answer field was empty.', 'bot', true);
+          status.textContent = 'Debug: ' + JSON.stringify(data);
+        }
+      } catch (e) {
+        removeTyping();
+        addMsg('Could not reach n8n. Error: ' + e.message, 'bot', true);
+        status.textContent = 'Check browser Console (F12) for details.';
+      }
+
+      btn.disabled = false;
+      btn.textContent = 'Ask';
+      input.focus();
+    }
+
+    btn.addEventListener('click', ask);
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') ask(); });
+  </script>
+</body>
+</html>

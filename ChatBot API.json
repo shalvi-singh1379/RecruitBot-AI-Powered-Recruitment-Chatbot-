@@ -1,0 +1,195 @@
+{
+  "name": "ChatBot API",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "resume-chat",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "7f97bb77-406f-46be-8fd3-4d36578f50c7",
+      "name": "Webhook",
+      "webhookId": "36c909b4-93e8-4371-9de8-d91753e48272"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1nA4gxOIsUmwgLSktLTh8lxOuhfC0JSznQz3shh1QOVI",
+          "mode": "list",
+          "cachedResultName": "Resume Shortlisting",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1nA4gxOIsUmwgLSktLTh8lxOuhfC0JSznQz3shh1QOVI/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1nA4gxOIsUmwgLSktLTh8lxOuhfC0JSznQz3shh1QOVI/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        208,
+        0
+      ],
+      "id": "dcb3ee80-1f7d-47f9-9b94-a8a95ad2ee12",
+      "name": "Get row(s) in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "gWON1q033eowV2cV",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Safely grab query from wherever the Webhook puts it\nconst webhookData = $('Webhook').first().json;\nconst userQuery = String(webhookData?.body?.query \n               || webhookData?.query \n               || \"No query received\");\n\n// Get all candidate rows from Google Sheets node\nconst candidates = $('Get row(s) in sheet').all().map(item => item.json);\n\nreturn {\n  json: {\n    userQuery: userQuery,\n    candidates: candidates,\n    candidateCount: candidates.length\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        0
+      ],
+      "id": "5c60ceb7-9982-48fa-a7b1-1c52320e7f6b",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4O-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "=You are a smart recruitment assistant called RecruitBot. \n\nYou have access to a database of {{ $json.candidateCount }} candidates. Here is the full data:\n\n{{ JSON.stringify($json.candidates) }}\n\nRules you must follow:\n- When asked for rankings, sort by score (highest first)\n- When asked for \"top N\", return exactly N candidates\n- When asked about a specific person, search by name or email\n- When filtering by skill, check the skills field for partial matches\n- Always mention the candidate's score, category, and reason in your answer\n- Format your response in a clean, readable way\n- If no candidates match the query, say so clearly\n- Never make up data that isn't in the database"
+            },
+            {
+              "content": "={{ String($json.userQuery) }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {
+          "maxTokens": 1000,
+          "temperature": 0.3
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        624,
+        0
+      ],
+      "id": "6574aa9e-8913-4f97-b9f7-e894bd20ebee",
+      "name": "Message a model",
+      "credentials": {
+        "openAiApi": {
+          "id": "EDDs0J68S4uGIAHe",
+          "name": "n8n free OpenAI API credits"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ answer:$json.output[0].content[0].text , status: \"success\" }) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Access-Control-Allow-Origin",
+                "value": "*"
+              },
+              {
+                "name": "Access-Control-Allow-Headers",
+                "value": "Content-Type"
+              }
+            ]
+          }
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        976,
+        0
+      ],
+      "id": "eabff4dd-969d-478f-a8cd-ce9477d82827",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "244ad2e8-49a8-442c-955e-0eab33a7d8cd",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d4b9d2f8c265a47d4d5c0a82da9e7416d5d958a9fda68e9fcdcc99c95d788736"
+  },
+  "id": "hCaU0bHgcKjGGPsX",
+  "tags": []
+}
